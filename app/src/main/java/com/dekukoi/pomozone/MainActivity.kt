@@ -1,9 +1,13 @@
 package com.dekukoi.pomozone
 
+import android.Manifest
+import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -19,6 +23,12 @@ import com.dekukoi.pomozone.ui.timer.TimerScreen
 import com.dekukoi.pomozone.ui.timer.TimerViewModel
 
 class MainActivity : ComponentActivity() {
+
+    private val requestNotificationPermission =
+        registerForActivityResult(ActivityResultContracts.RequestPermission()) {
+            // Permission outcome is intentionally ignored — the timer works either way.
+        }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
@@ -28,8 +38,23 @@ class MainActivity : ComponentActivity() {
             var selectedTab by rememberSaveable { mutableStateOf(AppTab.Timer) }
             val shellState = ShellState(selectedTab = selectedTab)
             val timerViewModel: TimerViewModel = viewModel(
-                factory = TimerViewModel.provideFactory(container.timerEngine),
+                factory = TimerViewModel.provideFactory(
+                    timerEngine = container.timerEngine,
+                    completionNotifier = container.completionNotifier,
+                ),
             )
+
+            // Wire permission request: called at most once, on first Start press.
+            timerViewModel.onRequestNotificationPermission = {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                    val alreadyGranted = checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) ==
+                            PackageManager.PERMISSION_GRANTED
+                    if (!alreadyGranted) {
+                        requestNotificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
+                    }
+                }
+            }
+
             LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
                 timerViewModel.refresh()
             }

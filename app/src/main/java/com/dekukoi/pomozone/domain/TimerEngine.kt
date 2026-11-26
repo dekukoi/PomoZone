@@ -1,7 +1,10 @@
 package com.dekukoi.pomozone.domain
 
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import java.time.Clock
@@ -14,6 +17,15 @@ class TimerEngine(
 ) {
     private val _state = MutableStateFlow(TimerState())
     val state: StateFlow<TimerState> = _state.asStateFlow()
+
+    /**
+     * Emits exactly once per block that completes while the caller passes
+     * [notify = true] into [tick]. The ViewModel's continuous tick loop
+     * passes true; the one-shot resume refresh passes false, so a block that
+     * finished while the process was suspended produces no event.
+     */
+    private val _completionEvents = MutableSharedFlow<CompletionEvent>(extraBufferCapacity = 1)
+    val completionEvents: SharedFlow<CompletionEvent> = _completionEvents.asSharedFlow()
 
     private var endInstant: Instant? = null
     private var blockStartInstant: Instant? = null
@@ -101,7 +113,12 @@ class TimerEngine(
         )
     }
 
-    suspend fun tick() {
+    /**
+     * @param notify if true, a [CompletionEvent] is emitted when a block finishes.
+     *               Pass false for the one-shot resume-refresh so that blocks that
+     *               ended while the process was suspended do not trigger a notification.
+     */
+    suspend fun tick(notify: Boolean = true) {
         if (_state.value.status == TimerStatus.Running) {
             val now = clock.instant()
             val end = endInstant ?: return
@@ -109,12 +126,12 @@ class TimerEngine(
             if (remaining > Duration.ZERO) {
                 _state.update { it.copy(remainingTime = remaining) }
             } else {
-                completeCurrentBlock(now)
+                completeCurrentBlock(now, notify = notify)
             }
         }
     }
 
-    private suspend fun completeCurrentBlock(now: Instant) {
+    private suspend fun completeCurrentBlock(now: Instant, notify: Boolean) {
         val currentMode = _state.value.mode
         val start = blockStartInstant ?: now.minus(PomodoroConfig.FOCUS_DURATION)
         endInstant = null
@@ -159,6 +176,10 @@ class TimerEngine(
             totalDuration = nextDuration,
             sessionInCycle = nextSessionInCycle,
         )
+
+        if (notify) {
+            _completionEvents.emit(CompletionEvent(finishedMode = currentMode, nextMode = nextMode))
+        }
     }
 
     private fun durationFor(mode: TimerMode): Duration = when (mode) {
