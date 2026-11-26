@@ -8,6 +8,6 @@ class PomoZoneApp : Application() {
 
     override fun onCreate() {
         super.onCreate()
-        container = AppContainer()
+        container = AppContainer.create(this)
     }
 }

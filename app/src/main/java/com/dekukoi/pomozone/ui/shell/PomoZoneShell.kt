@@ -44,6 +44,8 @@ fun PomoZoneShell(
     state: ShellState,
     onSelectTab: (AppTab) -> Unit,
     modifier: Modifier = Modifier,
+    timerContent: @Composable () -> Unit = { TimerScreen() },
+    statsContent: @Composable () -> Unit = { StatsScreen() },
 ) {
     Scaffold(
         modifier = modifier.fillMaxSize(),
@@ -61,8 +63,8 @@ fun PomoZoneShell(
                 .padding(innerPadding),
         ) {
             when (state.selectedTab) {
-                AppTab.Timer -> TimerScreen()
-                AppTab.Stats -> StatsScreen()
+                AppTab.Timer -> timerContent()
+                AppTab.Stats -> statsContent()
             }
         }
     }
@@ -117,25 +119,13 @@ private fun BottomBarItem(
     label: String,
     selected: Boolean,
     onClick: () -> Unit,
-    icon: @Composable (Color) -> Unit,
+    icon: @Composable (tint: Color) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val pillBackground = if (selected) {
-        MaterialTheme.colorScheme.primaryContainer
-    } else {
-        Color.Transparent
-    }
-    val iconTint = if (selected) {
-        MaterialTheme.colorScheme.onPrimaryContainer
-    } else {
-        MaterialTheme.colorScheme.onSurfaceVariant
-    }
-    val labelColor = if (selected) {
-        MaterialTheme.colorScheme.onSurface
-    } else {
-        MaterialTheme.colorScheme.onSurfaceVariant
-    }
-    val labelWeight = if (selected) FontWeight.Bold else FontWeight.Medium
+    val navPillBackground = MaterialTheme.colorScheme.primaryContainer
+    val navPillIcon = MaterialTheme.colorScheme.onPrimaryContainer
+    val muteColor = MaterialTheme.colorScheme.onSurfaceVariant
+    val inkColor = MaterialTheme.colorScheme.onSurface
 
     Column(
         modifier = modifier
@@ -148,20 +138,31 @@ private fun BottomBarItem(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(3.dp),
     ) {
-        Box(
-            modifier = Modifier
+        val pillModifier = if (selected) {
+            Modifier
                 .width(56.dp)
                 .height(30.dp)
                 .clip(RoundedCornerShape(15.dp))
-                .background(pillBackground),
+                .background(navPillBackground)
+        } else {
+            Modifier
+                .width(56.dp)
+                .height(30.dp)
+        }
+
+        Box(
+            modifier = pillModifier,
             contentAlignment = Alignment.Center,
         ) {
-            icon(iconTint)
+            val tint = if (selected) navPillIcon else muteColor
+            icon(tint)
         }
+
         Text(
             text = label,
-            style = MaterialTheme.typography.labelLarge.copy(fontWeight = labelWeight),
-            color = labelColor,
+            style = MaterialTheme.typography.labelLarge,
+            color = if (selected) inkColor else muteColor,
+            fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
         )
     }
 }
