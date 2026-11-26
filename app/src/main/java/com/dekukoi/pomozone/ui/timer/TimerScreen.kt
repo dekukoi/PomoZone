@@ -3,6 +3,7 @@ package com.dekukoi.pomozone.ui.timer
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.runtime.key
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -196,11 +197,15 @@ private fun ProgressRing(
         0f
     }
 
-    val animatedProgress by animateFloatAsState(
-        targetValue = targetProgress,
-        animationSpec = tween(durationMillis = 1000, easing = LinearEasing),
-        label = "ringProgress",
-    )
+    // key on mode so the animation resets to 1.0 instantly when transitioning to a new
+    // block, rather than animating upward from near-zero to full (the "refill" glitch).
+    val animatedProgress by key(state.mode) {
+        animateFloatAsState(
+            targetValue = targetProgress,
+            animationSpec = tween(durationMillis = 1000, easing = LinearEasing),
+            label = "ringProgress",
+        )
+    }
 
     val outlineColor = MaterialTheme.colorScheme.outline
 
