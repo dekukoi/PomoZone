@@ -419,4 +419,119 @@ class TimerEngineTest {
         assertEquals(1, state.sessionInCycle)
         assertEquals(4, store.sessions().first().size) // no extra saves
     }
+
+    // ── Ticket 05: background completion ─────────────────────────────────────
+
+    @Test
+    fun `running focus block completed by clock jump saves exactly one session and moves to short break idle`() = runTest {
+        val startInstant = Instant.parse("2026-01-01T10:00:00Z")
+        val testClock = MutableFakeClock(startInstant)
+        val store = InMemorySessionStore()
+        val engine = TimerEngine(clock = testClock, sessionStore = store)
+
+        engine.start()
+        // Simulate background period: jump 45 minutes ahead (well past 25 minutes)
+        testClock.advance(Duration.ofMinutes(45))
+        engine.tick()
+
+        val state = engine.state.value
+        assertEquals(TimerMode.ShortBreak, state.mode)
+        assertEquals(TimerStatus.Idle, state.status)
+        assertEquals(PomodoroConfig.SHORT_BREAK_DURATION, state.remainingTime)
+        assertEquals(PomodoroConfig.SHORT_BREAK_DURATION, state.totalDuration)
+
+        val sessions = store.sessions().first()
+        assertEquals(1, sessions.size)
+        assertEquals(startInstant, sessions[0].startInstant)
+        assertEquals(25L, sessions[0].durationMinutes)
+    }
+
+    @Test
+    fun `further ticks after clock jump completion save nothing more`() = runTest {
+        val startInstant = Instant.parse("2026-01-01T10:00:00Z")
+        val testClock = MutableFakeClock(startInstant)
+        val store = InMemorySessionStore()
+        val engine = TimerEngine(clock = testClock, sessionStore = store)
+
+        engine.start()
+        testClock.advance(Duration.ofMinutes(45))
+        engine.tick()
+
+        assertEquals(1, store.sessions().first().size)
+
+        // Multiple subsequent updates while in background / idle
+        testClock.advance(Duration.ofMinutes(5))
+        engine.tick()
+        testClock.advance(Duration.ofMinutes(30))
+        engine.tick()
+        testClock.advance(Duration.ofHours(2))
+        engine.tick()
+
+        val sessions = store.sessions().first()
+        assertEquals(1, sessions.size)
+        assertEquals(TimerStatus.Idle, engine.state.value.status)
+    }
+
+    @Test
+    fun `short break that ended while backgrounded moves to focus idle with no saved session`() = runTest {
+        val startInstant = Instant.parse("2026-01-01T10:00:00Z")
+        val testClock = MutableFakeClock(startInstant)
+        val store = InMemorySessionStore()
+        val engine = TimerEngine(clock = testClock, sessionStore = store)
+
+        // Complete 1 focus block
+        engine.start()
+        testClock.advance(PomodoroConfig.FOCUS_DURATION)
+        engine.tick()
+        assertEquals(1, store.sessions().first().size)
+        assertEquals(TimerMode.ShortBreak, engine.state.value.mode)
+
+        // Start short break and let it finish in background (jump 20 minutes)
+        engine.start()
+        testClock.advance(Duration.ofMinutes(20))
+        engine.tick()
+
+        val state = engine.state.value
+        assertEquals(TimerMode.Focus, state.mode)
+        assertEquals(TimerStatus.Idle, state.status)
+        assertEquals(PomodoroConfig.FOCUS_DURATION, state.remainingTime)
+        assertEquals(PomodoroConfig.FOCUS_DURATION, state.totalDuration)
+        assertEquals(2, state.sessionInCycle)
+        // Breaks save no session: count remains 1
+        assertEquals(1, store.sessions().first().size)
+    }
+
+    @Test
+    fun `long break that ended while backgrounded moves to focus idle with cycle reset`() = runTest {
+        val startInstant = Instant.parse("2026-01-01T10:00:00Z")
+        val testClock = MutableFakeClock(startInstant)
+        val store = InMemorySessionStore()
+        val engine = TimerEngine(clock = testClock, sessionStore = store)
+
+        // Complete 4 focus blocks
+        repeat(3) {
+            engine.start()
+            testClock.advance(PomodoroConfig.FOCUS_DURATION)
+            engine.tick()
+            engine.skip() // skip short break
+        }
+        engine.start()
+        testClock.advance(PomodoroConfig.FOCUS_DURATION)
+        engine.tick()
+        assertEquals(TimerMode.LongBreak, engine.state.value.mode)
+        assertEquals(4, store.sessions().first().size)
+
+        // Start long break and jump ahead 60 minutes in background
+        engine.start()
+        testClock.advance(Duration.ofMinutes(60))
+        engine.tick()
+
+        val state = engine.state.value
+        assertEquals(TimerMode.Focus, state.mode)
+        assertEquals(TimerStatus.Idle, state.status)
+        assertEquals(PomodoroConfig.FOCUS_DURATION, state.remainingTime)
+        assertEquals(1, state.sessionInCycle)
+        // Still exactly 4 sessions saved
+        assertEquals(4, store.sessions().first().size)
+    }
 }

@@ -52,4 +52,43 @@ class TimerViewModelTest {
 
         assertEquals(TimerStatus.Running, viewModel.state.value.status)
     }
+
+    @Test
+    fun `refresh triggers immediate engine update when returning from background`() {
+        val viewModel = TimerViewModel(timerEngine = engine)
+        viewModel.onStart()
+        assertEquals(TimerStatus.Running, viewModel.state.value.status)
+
+        // Advance clock past 25 minutes while app was in background
+        clock.advance(Duration.ofMinutes(30))
+
+        // Immediate refresh when returning to app
+        viewModel.refresh()
+        testDispatcher.scheduler.runCurrent()
+
+        // State is updated immediately to ShortBreak Idle
+        assertEquals(TimerMode.ShortBreak, viewModel.state.value.mode)
+        assertEquals(TimerStatus.Idle, viewModel.state.value.status)
+    }
+
+    @Test
+    fun `timer state is preserved when a new view model receives the same engine after a configuration change`() {
+        val viewModel1 = TimerViewModel(timerEngine = engine)
+        viewModel1.onStart()
+        clock.advance(Duration.ofMinutes(10))
+        // Simulate a tick so remaining time is recorded in the engine
+        viewModel1.refresh()
+        testDispatcher.scheduler.runCurrent()
+
+        val remainingBefore = viewModel1.state.value.remainingTime
+        assertEquals(TimerStatus.Running, viewModel1.state.value.status)
+
+        // Simulate config change: new ViewModel receives same engine (singleton in AppContainer)
+        val viewModel2 = TimerViewModel(timerEngine = engine)
+
+        // New ViewModel sees the same running state without any restart
+        assertEquals(TimerStatus.Running, viewModel2.state.value.status)
+        assertEquals(TimerMode.Focus, viewModel2.state.value.mode)
+        assertEquals(remainingBefore, viewModel2.state.value.remainingTime)
+    }
 }

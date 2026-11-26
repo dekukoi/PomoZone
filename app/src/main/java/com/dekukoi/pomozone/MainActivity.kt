@@ -8,6 +8,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.dekukoi.pomozone.ui.shell.AppTab
 import com.dekukoi.pomozone.ui.shell.PomoZoneShell
@@ -28,6 +30,9 @@ class MainActivity : ComponentActivity() {
             val timerViewModel: TimerViewModel = viewModel(
                 factory = TimerViewModel.provideFactory(container.timerEngine),
             )
+            LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
+                timerViewModel.refresh()
+            }
             PomoZoneTheme {
                 PomoZoneShell(
                     state = shellState,

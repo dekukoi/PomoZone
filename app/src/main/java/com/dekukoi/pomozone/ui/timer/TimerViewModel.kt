@@ -44,6 +44,12 @@ class TimerViewModel(
         timerEngine.skip()
     }
 
+    fun refresh() {
+        viewModelScope.launch {
+            timerEngine.tick()
+        }
+    }
+
     companion object {
         fun provideFactory(timerEngine: TimerEngine): ViewModelProvider.Factory =
             object : ViewModelProvider.Factory {
