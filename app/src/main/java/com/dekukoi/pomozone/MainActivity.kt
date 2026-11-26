@@ -4,44 +4,32 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
+import com.dekukoi.pomozone.ui.shell.AppTab
+import com.dekukoi.pomozone.ui.shell.PomoZoneShell
+import com.dekukoi.pomozone.ui.shell.ShellState
 import com.dekukoi.pomozone.ui.theme.PomoZoneTheme
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        val container = (application as PomoZoneApp).container
+        check(container.clock.zone != null)
         setContent {
+            var selectedTab by rememberSaveable { mutableStateOf(AppTab.Timer) }
+            val shellState = ShellState(selectedTab = selectedTab)
             PomoZoneTheme {
-                Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
-                    Greeting(
-                        name = "PomoZone",
-                        modifier = Modifier.padding(innerPadding),
-                    )
-                }
+                PomoZoneShell(
+                    state = shellState,
+                    onSelectTab = { tab ->
+                        selectedTab = shellState.selectTab(tab).selectedTab
+                    },
+                )
             }
         }
-    }
-}
-
-@Composable
-fun Greeting(name: String, modifier: Modifier = Modifier) {
-    Text(
-        text = "Hello $name!",
-        modifier = modifier,
-    )
-}
-
-@Preview(showBackground = true)
-@Composable
-fun GreetingPreview() {
-    PomoZoneTheme {
-        Greeting("PomoZone")
     }
 }
