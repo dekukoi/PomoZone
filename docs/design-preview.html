@@ -1,0 +1,190 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>PomoZone: UI samples and features</title>
+<style>
+:root{--bg:#f6f1ea;--panel:#fffdf9;--ink:#2a211c;--mute:#7b6e65;--line:#e6ddd2;--focus:#e5533d;--break:#3f9b6e;--long:#4a7bd0;
+--h0:#efe7dc;--h1:#f6c9bf;--h2:#ef9a87;--h3:#e5533d;--h4:#b8321f;--phone:#1d1613;
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#17120f;--panel:#221b17;--ink:#f3ebe3;--mute:#a1948a;--line:#3a2f29;--h0:#2e2520;--h1:#5a2d25;--h2:#8f3d2e;--h3:#d2503a;--h4:#f07a62;--phone:#0c0908}}
+:root[data-theme="dark"]{--bg:#17120f;--panel:#221b17;--ink:#f3ebe3;--mute:#a1948a;--line:#3a2f29;--h0:#2e2520;--h1:#5a2d25;--h2:#8f3d2e;--h3:#d2503a;--h4:#f07a62;--phone:#0c0908}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*,*::before,*::after{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+main{max-width:1100px;margin:0 auto;padding:40px 20px 64px}
+h1{font-size:clamp(28px,5vw,44px);line-height:1.1;margin:0 0 8px;letter-spacing:-.02em}
+h2{font-size:13px;text-transform:uppercase;letter-spacing:.12em;color:var(--mute);margin:48px 0 16px}
+.lead{color:var(--mute);max-width:60ch;margin:0}
+.toggle{float:right;border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:999px;padding:6px 14px;font:inherit;font-size:13px;cursor:pointer}
+.screens{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr));gap:32px;justify-items:center}
+figure{margin:0;width:100%;max-width:320px;min-width:0}
+figcaption{margin-top:14px;font-size:14px;color:var(--mute);text-align:center}
+figcaption b{display:block;color:var(--ink);font-size:15px}
+.phone{background:var(--phone);border-radius:38px;padding:10px;box-shadow:0 18px 40px rgba(0,0,0,.18)}
+.screen{background:var(--panel);border-radius:30px;height:620px;display:flex;flex-direction:column;overflow:hidden;position:relative}
+.status{display:flex;justify-content:space-between;padding:12px 22px 4px;font-size:12px;font-weight:600}
+.body{flex:1;padding:8px 18px;display:flex;flex-direction:column;min-height:0;overflow:hidden}
+.nav{flex:none;position:relative;z-index:2;background:var(--panel);border-top:1px solid var(--line);padding:8px 0 8px}
+.nav .items{display:flex}
+.nav .items div{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;font-size:12px;font-weight:500;color:var(--mute)}
+.nav .items div.on{color:var(--ink);font-weight:700}
+.pill{width:56px;height:30px;border-radius:15px;display:grid;place-content:center}
+.nav .items div.on .pill{background:var(--h1);color:var(--h4)}
+.pill svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.home{width:104px;height:4px;border-radius:2px;background:var(--ink);opacity:.45;margin:10px auto 2px}
+.chips{display:flex;gap:6px;justify-content:center;margin:6px 0 10px}
+.chip{font-size:11px;padding:5px 11px;border-radius:999px;border:1px solid var(--line);color:var(--mute)}
+.chip.on{background:var(--focus);border-color:var(--focus);color:#fff;font-weight:700}
+.ring{position:relative;width:216px;height:216px;margin:10px auto}
+.ring svg{width:100%;height:100%;transform:rotate(-90deg)}
+.ring .t{position:absolute;inset:0;display:grid;place-content:center;text-align:center}
+.ring .t b{font-size:46px;font-variant-numeric:tabular-nums;letter-spacing:-.02em;line-height:1}
+.ring .t span{font-size:12px;color:var(--mute);margin-top:6px}
+.dots{display:flex;gap:8px;justify-content:center;margin:6px 0 14px}
+.dots i{width:10px;height:10px;border-radius:50%;background:var(--line)}
+.dots i.d{background:var(--focus)}
+.dots i.c{background:none;border:2px solid var(--focus)}
+.ctrl{display:flex;gap:12px;justify-content:center;align-items:center;margin-top:auto;margin-bottom:14px}
+.btn{width:46px;height:46px;border-radius:50%;border:1px solid var(--line);display:grid;place-content:center;color:var(--mute);font-size:16px}
+.btn.big{width:72px;height:72px;background:var(--focus);border:0;color:#fff;font-size:26px}
+.cards{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.card{background:var(--bg);border-radius:14px;padding:8px 12px;min-width:0}
+.card small{display:block;font-size:10px;color:var(--mute);text-transform:uppercase;letter-spacing:.06em}
+.card b{display:block;font-size:20px;line-height:1.2;letter-spacing:-.01em}
+.row{display:flex;gap:10px;align-items:center}
+.goal{flex:0 0 64px;text-align:center}
+.goal svg{width:56px;height:56px;transform:rotate(-90deg);display:block;margin:0 auto}
+.panel{background:var(--bg);border-radius:14px;padding:10px 12px}
+.panel h3{margin:0 0 8px;font-size:11px;color:var(--mute);text-transform:uppercase;letter-spacing:.06em;font-weight:600}
+.bars{display:flex;align-items:flex-end;gap:7px;height:78px}
+.bars div{flex:1;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;gap:4px;height:100%;font-size:9px;color:var(--mute)}
+.bars span{width:100%;border-radius:5px 5px 2px 2px;background:var(--focus);transform-origin:bottom;animation:grow .9s ease-out both}
+.bars div.today span{background:var(--h4)}
+@keyframes grow{from{transform:scaleY(0)}}
+.heat{display:grid;grid-template-columns:repeat(12,1fr);grid-template-rows:repeat(7,11px);grid-auto-flow:column;gap:3px}
+.heat i{border-radius:3px;display:block}
+.legend{display:flex;gap:3px;align-items:center;justify-content:flex-end;margin-top:6px;font-size:9px;color:var(--mute)}
+.legend i{width:9px;height:9px;border-radius:2px;display:block}
+.notif{position:absolute;left:12px;right:12px;top:44px;background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:12px 14px;box-shadow:0 10px 24px rgba(0,0,0,.2);font-size:13px}
+.notif b{display:block}
+.notif small{color:var(--mute)}
+.dim{position:absolute;inset:0;background:var(--bg);opacity:.55}
+.lock{display:grid;place-content:center;text-align:center;flex:1;padding-top:60px}
+.lock b{font-size:56px;font-weight:300;letter-spacing:-.03em}
+.features{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr));gap:16px}
+.feat{background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:20px;min-width:0}
+.feat h3{margin:0 0 4px;font-size:18px}
+.feat p{margin:0 0 12px;color:var(--mute);font-size:14px}
+.feat ul{margin:0;padding-left:18px;font-size:14px}
+.feat li{margin:4px 0}
+.tag{display:inline-block;font-size:11px;font-weight:700;border-radius:999px;padding:2px 9px;margin-bottom:10px;background:var(--h1);color:var(--h4)}
+.feat.skip{border-style:dashed;background:none}
+.feat.skip .tag{background:var(--h0);color:var(--mute)}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><symbol id="i-timer" viewBox="0 0 24 24"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 2M9.5 2.5h5"/></symbol><symbol id="i-stats" viewBox="0 0 24 24"><path d="M5 20v-9M12 20V4M19 20v-6"/></symbol></svg>
+<main>
+<button class="toggle" id="theme" type="button">Toggle theme</button>
+<h1>🍅 PomoZone</h1>
+<p class="lead">A Pomodoro timer with a visual statistics dashboard. Three screens, one Room table, no gamification. This is what the finished app will look like and do.</p>
+
+<h2>Screens</h2>
+<div class="screens">
+
+<figure>
+<div class="phone"><div class="screen">
+<div class="status"><span>9:41</span><span>●●● ▮</span></div>
+<div class="body">
+<div class="chips"><span class="chip on">Focus</span><span class="chip">Short break</span><span class="chip">Long break</span></div>
+<div class="ring">
+<svg viewBox="0 0 200 200"><circle cx="100" cy="100" r="86" fill="none" stroke="var(--line)" stroke-width="12"/><circle cx="100" cy="100" r="86" fill="none" stroke="var(--focus)" stroke-width="12" stroke-linecap="round" stroke-dasharray="540.4" stroke-dashoffset="205"/></svg>
+<div class="t"><b>15:32</b><span>Session 2 of 4</span></div>
+</div>
+<div class="dots"><i class="d"></i><i class="c"></i><i></i><i></i></div>
+<div class="ctrl"><div class="btn">↺</div><div class="btn big">⏸</div><div class="btn">⏭</div></div>
+</div>
+<div class="nav"><div class="items"><div class="on"><span class="pill"><svg><use href="#i-timer"/></svg></span>Timer</div><div><span class="pill"><svg><use href="#i-stats"/></svg></span>Stats</div></div><div class="home"></div></div>
+</div></div>
+<figcaption><b>Timer</b>Progress ring, mode chips, session dots, start/pause/reset</figcaption>
+</figure>
+
+<figure>
+<div class="phone"><div class="screen">
+<div class="status"><span>9:41</span><span>●●● ▮</span></div>
+<div class="body" style="gap:8px">
+<div class="cards">
+<div class="card"><small>Today</small><b>1h 40m</b></div>
+<div class="card"><small>This week</small><b>7h 15m</b></div>
+<div class="card"><small>All time</small><b>42h 5m</b></div>
+<div class="card"><small>Streak</small><b>5 days 🔥</b></div>
+</div>
+<div class="row panel">
+<div class="goal"><svg viewBox="0 0 80 80"><circle cx="40" cy="40" r="32" fill="none" stroke="var(--line)" stroke-width="8"/><circle cx="40" cy="40" r="32" fill="none" stroke="var(--focus)" stroke-width="8" stroke-linecap="round" stroke-dasharray="201" stroke-dashoffset="50"/></svg></div>
+<div><b style="font-size:18px">3 of 4</b><br><span style="font-size:12px;color:var(--mute)">sessions today</span></div>
+</div>
+<div class="panel"><h3>Last 7 days (minutes)</h3>
+<div class="bars">
+<div><span style="height:55%"></span>M</div><div><span style="height:80%"></span>T</div><div><span style="height:30%"></span>W</div><div><span style="height:100%"></span>T</div><div><span style="height:12%"></span>F</div><div><span style="height:65%"></span>S</div><div class="today"><span style="height:72%"></span>S</div>
+</div></div>
+<div class="panel"><h3>Last 12 weeks</h3><div class="heat" id="heat"></div>
+<div class="legend">Less <i style="background:var(--h0)"></i><i style="background:var(--h1)"></i><i style="background:var(--h2)"></i><i style="background:var(--h3)"></i><i style="background:var(--h4)"></i> More</div></div>
+</div>
+<div class="nav"><div class="items"><div><span class="pill"><svg><use href="#i-timer"/></svg></span>Timer</div><div class="on"><span class="pill"><svg><use href="#i-stats"/></svg></span>Stats</div></div><div class="home"></div></div>
+</div></div>
+<figcaption><b>Stats dashboard</b>Summary cards, daily goal ring, weekly bars, 12-week heatmap</figcaption>
+</figure>
+
+<figure>
+<div class="phone"><div class="screen">
+<div class="status"><span>9:41</span><span>●●● ▮</span></div>
+<div class="lock"><small style="color:var(--mute)">Wednesday, November 25</small><b>9:41</b></div>
+<div class="notif"><small>🍅 POMOZONE · now</small><b>Focus session complete</b>Nice work. Take a 5 minute break.</div>
+<div class="home" style="margin:0 auto 12px"></div>
+</div></div>
+<figcaption><b>Session-end alert</b>Notification and vibration when a block finishes</figcaption>
+</figure>
+
+</div>
+
+<h2>Features</h2>
+<div class="features">
+<div class="feat"><span class="tag">TIMER</span><h3>Pomodoro cycle</h3><p>The core loop.</p><ul>
+<li>Focus 25 min, short break 5, long break 15 after every 4th focus</li>
+<li>Start, pause, resume, reset, skip</li>
+<li>Animated progress ring and session dots</li>
+<li>Stays accurate when the app is backgrounded</li></ul></div>
+<div class="feat"><span class="tag">STATS</span><h3>Visual dashboard</h3><p>Everything is drawn from one list of sessions.</p><ul>
+<li>Today, week, and all-time focus totals</li>
+<li>Daily goal ring (sessions today)</li>
+<li>Weekly bar chart that animates in</li>
+<li>GitHub-style heatmap of 12 weeks</li>
+<li>Streak counter</li></ul></div>
+<div class="feat"><span class="tag">ALERTS</span><h3>Completion notice</h3><p>So you can leave the screen.</p><ul>
+<li>Notification when a session ends</li>
+<li>Vibration</li>
+<li>Only finished focus blocks are logged</li></ul></div>
+<div class="feat"><span class="tag">POLISH</span><h3>Look and feel</h3><p>Cheap touches that read well in a README GIF.</p><ul>
+<li>Light and dark theme</li>
+<li>Focus is red, breaks are green and blue</li>
+<li>Empty state for a first launch</li>
+<li>Demo data in debug builds for screenshots</li></ul></div>
+<div class="feat skip"><span class="tag">NOT IN SCOPE</span><h3>Left out on purpose</h3><p>Listed in the README as “what I’d add next”.</p><ul>
+<li>XP, levels, badges</li>
+<li>Settings screen for custom durations</li>
+<li>Foreground service</li>
+<li>Cloud sync or accounts</li></ul></div>
+</div>
+</main>
+<script>
+(function(){
+var h=document.getElementById('heat'),s=7,html='';
+for(var c=0;c<12;c++)for(var r=0;r<7;r++){s=(s*9301+49297)%233280;var v=s/233280,l=v<.3?0:v<.5?1:v<.72?2:v<.9?3:4;if(c===11&&r>3)l=0;html+='<i style="background:var(--h'+l+')"></i>'}
+h.innerHTML=html;
+document.getElementById('theme').onclick=function(){var d=document.documentElement,dark=d.getAttribute('data-theme')?d.getAttribute('data-theme')==='dark':matchMedia('(prefers-color-scheme:dark)').matches;d.setAttribute('data-theme',dark?'light':'dark')};
+})();
+</script>
+</body>
+</html>
