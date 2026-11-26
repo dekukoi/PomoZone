@@ -92,4 +92,108 @@ class TimerEngineTest {
         sessions = store.sessions().first()
         assertEquals(1, sessions.size)
     }
+
+    // ── Ticket 03: pause / resume / reset ────────────────────────────────────
+
+    @Test
+    fun `pausing a running block transitions status to paused`() {
+        val engine = TimerEngine(clock = clock, sessionStore = sessionStore)
+        engine.start()
+        engine.pause()
+        assertEquals(TimerStatus.Paused, engine.state.value.status)
+    }
+
+    @Test
+    fun `pause then resume after real time leaves remaining time exactly as it was at pause`() {
+        val engine = TimerEngine(clock = clock, sessionStore = sessionStore)
+        engine.start()
+
+        // Run for 5 minutes
+        clock.advance(Duration.ofMinutes(5))
+        engine.pause()
+        val remainingAtPause = engine.state.value.remainingTime
+        assertEquals(Duration.ofMinutes(20), remainingAtPause)
+
+        // Let real time pass while paused — 10 minutes go by
+        clock.advance(Duration.ofMinutes(10))
+        engine.resume()
+
+        // After resume the remaining must be exactly 20 minutes, not 10
+        assertEquals(Duration.ofMinutes(20), engine.state.value.remainingTime)
+        assertEquals(TimerStatus.Running, engine.state.value.status)
+    }
+
+    @Test
+    fun `pausing saves nothing to the session store`() = runTest {
+        val engine = TimerEngine(clock = clock, sessionStore = sessionStore)
+        engine.start()
+        clock.advance(Duration.ofMinutes(10))
+        engine.pause()
+
+        val sessions = sessionStore.sessions().first()
+        assertEquals(0, sessions.size)
+    }
+
+    @Test
+    fun `reset while running returns to full duration idle and saves nothing`() = runTest {
+        val engine = TimerEngine(clock = clock, sessionStore = sessionStore)
+        engine.start()
+        clock.advance(Duration.ofMinutes(10))
+        engine.reset()
+
+        val state = engine.state.value
+        assertEquals(TimerStatus.Idle, state.status)
+        assertEquals(PomodoroConfig.FOCUS_DURATION, state.remainingTime)
+        assertEquals(0, sessionStore.sessions().first().size)
+    }
+
+    @Test
+    fun `reset while paused returns to full duration idle and saves nothing`() = runTest {
+        val engine = TimerEngine(clock = clock, sessionStore = sessionStore)
+        engine.start()
+        clock.advance(Duration.ofMinutes(10))
+        engine.pause()
+        engine.reset()
+
+        val state = engine.state.value
+        assertEquals(TimerStatus.Idle, state.status)
+        assertEquals(PomodoroConfig.FOCUS_DURATION, state.remainingTime)
+        assertEquals(0, sessionStore.sessions().first().size)
+    }
+
+    @Test
+    fun `reset while idle keeps full duration idle and saves nothing`() = runTest {
+        val engine = TimerEngine(clock = clock, sessionStore = sessionStore)
+        engine.reset()
+
+        val state = engine.state.value
+        assertEquals(TimerStatus.Idle, state.status)
+        assertEquals(PomodoroConfig.FOCUS_DURATION, state.remainingTime)
+        assertEquals(0, sessionStore.sessions().first().size)
+    }
+
+    @Test
+    fun `completed block after pause and resume carries the original start instant`() = runTest {
+        val originalStart = Instant.parse("2026-01-01T10:00:00Z")
+        val testClock = MutableFakeClock(originalStart)
+        val store = InMemorySessionStore()
+        val engine = TimerEngine(clock = testClock, sessionStore = store)
+
+        engine.start()
+        // Advance 5 minutes, then pause
+        testClock.advance(Duration.ofMinutes(5))
+        engine.pause()
+
+        // 10 minutes of wall time pass while paused
+        testClock.advance(Duration.ofMinutes(10))
+        engine.resume()
+
+        // Run the remaining 20 minutes to completion
+        testClock.advance(Duration.ofMinutes(20))
+        engine.tick()
+
+        val sessions = store.sessions().first()
+        assertEquals(1, sessions.size)
+        assertEquals(originalStart, sessions[0].startInstant)
+    }
 }

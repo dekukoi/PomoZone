@@ -29,6 +29,42 @@ class TimerEngine(
         }
     }
 
+    fun pause() {
+        if (_state.value.status == TimerStatus.Running) {
+            val now = clock.instant()
+            val end = endInstant ?: return
+            val remaining = Duration.between(now, end).coerceAtLeast(Duration.ZERO)
+            endInstant = null
+            _state.update { it.copy(status = TimerStatus.Paused, remainingTime = remaining) }
+        }
+    }
+
+    fun resume() {
+        if (_state.value.status == TimerStatus.Paused) {
+            val now = clock.instant()
+            endInstant = now.plus(_state.value.remainingTime)
+            _state.update { it.copy(status = TimerStatus.Running) }
+        }
+    }
+
+    fun reset() {
+        endInstant = null
+        blockStartInstant = null
+        val currentMode = _state.value.mode
+        val fullDuration = when (currentMode) {
+            TimerMode.Focus -> PomodoroConfig.FOCUS_DURATION
+            TimerMode.ShortBreak -> PomodoroConfig.SHORT_BREAK_DURATION
+            TimerMode.LongBreak -> PomodoroConfig.LONG_BREAK_DURATION
+        }
+        _state.update {
+            it.copy(
+                status = TimerStatus.Idle,
+                remainingTime = fullDuration,
+                totalDuration = fullDuration,
+            )
+        }
+    }
+
     suspend fun tick() {
         if (_state.value.status == TimerStatus.Running) {
             val now = clock.instant()
