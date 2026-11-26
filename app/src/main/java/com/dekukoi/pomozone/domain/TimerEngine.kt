@@ -18,6 +18,13 @@ class TimerEngine(
     private var endInstant: Instant? = null
     private var blockStartInstant: Instant? = null
 
+    /**
+     * Number of truly completed Focus sessions in the current cycle (0–4).
+     * Only incremented when a Focus block runs to zero (never on skip or reset).
+     * This drives the LongBreak trigger and the cycle reset.
+     */
+    private var completedInCycle: Int = 0
+
     fun start() {
         if (_state.value.status != TimerStatus.Running) {
             val now = clock.instant()
@@ -51,11 +58,8 @@ class TimerEngine(
         endInstant = null
         blockStartInstant = null
         val currentMode = _state.value.mode
-        val fullDuration = when (currentMode) {
-            TimerMode.Focus -> PomodoroConfig.FOCUS_DURATION
-            TimerMode.ShortBreak -> PomodoroConfig.SHORT_BREAK_DURATION
-            TimerMode.LongBreak -> PomodoroConfig.LONG_BREAK_DURATION
-        }
+        val fullDuration = durationFor(currentMode)
+        // completedInCycle and sessionInCycle are intentionally left unchanged by reset
         _state.update {
             it.copy(
                 status = TimerStatus.Idle,
@@ -63,6 +67,38 @@ class TimerEngine(
                 totalDuration = fullDuration,
             )
         }
+    }
+
+    fun skip() {
+        val currentMode = _state.value.mode
+        endInstant = null
+        blockStartInstant = null
+
+        val (nextMode, nextSessionInCycle) = when (currentMode) {
+            // Skipping a focus block: does NOT count toward the cycle.
+            // Go to ShortBreak showing how many have been completed so far.
+            TimerMode.Focus -> TimerMode.ShortBreak to completedInCycle
+
+            // Skipping a break behaves exactly like completing it: advance to next focus.
+            TimerMode.ShortBreak -> {
+                val next = completedInCycle + 1
+                TimerMode.Focus to next
+            }
+            TimerMode.LongBreak -> {
+                // Reset cycle
+                completedInCycle = 0
+                TimerMode.Focus to 1
+            }
+        }
+
+        val nextDuration = durationFor(nextMode)
+        _state.value = TimerState(
+            mode = nextMode,
+            status = TimerStatus.Idle,
+            remainingTime = nextDuration,
+            totalDuration = nextDuration,
+            sessionInCycle = nextSessionInCycle,
+        )
     }
 
     suspend fun tick() {
@@ -84,22 +120,50 @@ class TimerEngine(
         endInstant = null
         blockStartInstant = null
 
-        if (currentMode == TimerMode.Focus) {
-            sessionStore.save(
-                SessionRecord(
-                    startInstant = start,
-                    durationMinutes = PomodoroConfig.FOCUS_DURATION.toMinutes(),
+        val (nextMode, nextSessionInCycle) = when (currentMode) {
+            TimerMode.Focus -> {
+                // Save the session
+                sessionStore.save(
+                    SessionRecord(
+                        startInstant = start,
+                        durationMinutes = PomodoroConfig.FOCUS_DURATION.toMinutes(),
+                    )
                 )
-            )
+                // Increment the completed count
+                completedInCycle++
+                if (completedInCycle >= PomodoroConfig.CYCLE_LENGTH) {
+                    // 4th session done → long break
+                    TimerMode.LongBreak to completedInCycle
+                } else {
+                    // 1st–3rd done → short break
+                    TimerMode.ShortBreak to completedInCycle
+                }
+            }
+            TimerMode.ShortBreak -> {
+                // Break over → next focus block
+                val next = completedInCycle + 1
+                TimerMode.Focus to next
+            }
+            TimerMode.LongBreak -> {
+                // Long break over → reset cycle
+                completedInCycle = 0
+                TimerMode.Focus to 1
+            }
         }
 
-        // Until ticket 04 adds breaks, simply return to an idle Focus block
+        val nextDuration = durationFor(nextMode)
         _state.value = TimerState(
-            mode = TimerMode.Focus,
+            mode = nextMode,
             status = TimerStatus.Idle,
-            remainingTime = PomodoroConfig.FOCUS_DURATION,
-            totalDuration = PomodoroConfig.FOCUS_DURATION,
-            sessionInCycle = _state.value.sessionInCycle,
+            remainingTime = nextDuration,
+            totalDuration = nextDuration,
+            sessionInCycle = nextSessionInCycle,
         )
+    }
+
+    private fun durationFor(mode: TimerMode): Duration = when (mode) {
+        TimerMode.Focus -> PomodoroConfig.FOCUS_DURATION
+        TimerMode.ShortBreak -> PomodoroConfig.SHORT_BREAK_DURATION
+        TimerMode.LongBreak -> PomodoroConfig.LONG_BREAK_DURATION
     }
 }

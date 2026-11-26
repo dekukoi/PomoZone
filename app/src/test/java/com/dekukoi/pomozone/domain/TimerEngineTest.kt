@@ -46,7 +46,7 @@ class TimerEngineTest {
     }
 
     @Test
-    fun `when remaining time reaches zero exactly one session is saved and returns to idle focus block`() = runTest {
+    fun `when remaining time reaches zero exactly one session is saved and engine moves to short break idle`() = runTest {
         val startInstant = Instant.parse("2026-01-01T10:00:00Z")
         val testClock = MutableFakeClock(startInstant)
         val store = InMemorySessionStore()
@@ -61,11 +61,11 @@ class TimerEngineTest {
         assertEquals(startInstant, sessions[0].startInstant)
         assertEquals(25L, sessions[0].durationMinutes)
 
-        // Returned to idle focus block
+        // Ticket 04: completed focus block moves to Short break in the idle state
         val state = engine.state.value
-        assertEquals(TimerMode.Focus, state.mode)
+        assertEquals(TimerMode.ShortBreak, state.mode)
         assertEquals(TimerStatus.Idle, state.status)
-        assertEquals(Duration.ofMinutes(25), state.remainingTime)
+        assertEquals(PomodoroConfig.SHORT_BREAK_DURATION, state.remainingTime)
     }
 
     @Test
@@ -195,5 +195,228 @@ class TimerEngineTest {
         val sessions = store.sessions().first()
         assertEquals(1, sessions.size)
         assertEquals(originalStart, sessions[0].startInstant)
+    }
+
+    // ── Ticket 04: cycle, breaks and skip ─────────────────────────────────────
+
+    @Test
+    fun `completed focus block moves to short break in idle state showing 5 minutes`() = runTest {
+        val engine = TimerEngine(clock = clock, sessionStore = sessionStore)
+        engine.start()
+        clock.advance(PomodoroConfig.FOCUS_DURATION)
+        engine.tick()
+
+        val state = engine.state.value
+        assertEquals(TimerMode.ShortBreak, state.mode)
+        assertEquals(TimerStatus.Idle, state.status)
+        assertEquals(PomodoroConfig.SHORT_BREAK_DURATION, state.remainingTime)
+        assertEquals(PomodoroConfig.SHORT_BREAK_DURATION, state.totalDuration)
+    }
+
+    @Test
+    fun `fourth completed focus block leads to a long break showing 15 minutes`() = runTest {
+        val engine = TimerEngine(clock = clock, sessionStore = sessionStore)
+        repeat(3) {
+            engine.start()
+            clock.advance(PomodoroConfig.FOCUS_DURATION)
+            engine.tick()
+            // skip the break to get back to focus quickly
+            engine.skip()
+        }
+        // 4th focus block
+        engine.start()
+        clock.advance(PomodoroConfig.FOCUS_DURATION)
+        engine.tick()
+
+        val state = engine.state.value
+        assertEquals(TimerMode.LongBreak, state.mode)
+        assertEquals(TimerStatus.Idle, state.status)
+        assertEquals(PomodoroConfig.LONG_BREAK_DURATION, state.remainingTime)
+    }
+
+    @Test
+    fun `after long break the next block is focus and cycle count is back at zero`() = runTest {
+        val engine = TimerEngine(clock = clock, sessionStore = sessionStore)
+        repeat(3) {
+            engine.start()
+            clock.advance(PomodoroConfig.FOCUS_DURATION)
+            engine.tick()
+            engine.skip()
+        }
+        // 4th focus block → long break
+        engine.start()
+        clock.advance(PomodoroConfig.FOCUS_DURATION)
+        engine.tick()
+
+        // Complete long break
+        engine.start()
+        clock.advance(PomodoroConfig.LONG_BREAK_DURATION)
+        engine.tick()
+
+        val state = engine.state.value
+        assertEquals(TimerMode.Focus, state.mode)
+        assertEquals(TimerStatus.Idle, state.status)
+        assertEquals(1, state.sessionInCycle)
+    }
+
+    @Test
+    fun `after a short break the next block is focus`() = runTest {
+        val engine = TimerEngine(clock = clock, sessionStore = sessionStore)
+        engine.start()
+        clock.advance(PomodoroConfig.FOCUS_DURATION)
+        engine.tick()
+        // Now in short break idle
+        engine.start()
+        clock.advance(PomodoroConfig.SHORT_BREAK_DURATION)
+        engine.tick()
+
+        val state = engine.state.value
+        assertEquals(TimerMode.Focus, state.mode)
+        assertEquals(TimerStatus.Idle, state.status)
+    }
+
+    @Test
+    fun `next block after completing never starts by itself and waits in idle`() = runTest {
+        val engine = TimerEngine(clock = clock, sessionStore = sessionStore)
+        engine.start()
+        clock.advance(PomodoroConfig.FOCUS_DURATION)
+        engine.tick()
+
+        // Should be idle, not running
+        assertEquals(TimerStatus.Idle, engine.state.value.status)
+    }
+
+    @Test
+    fun `skipping a focus block moves to short break idle and saves nothing`() = runTest {
+        val engine = TimerEngine(clock = clock, sessionStore = sessionStore)
+        // Start and partially run a focus block
+        engine.start()
+        clock.advance(Duration.ofMinutes(10))
+        engine.skip()
+
+        val state = engine.state.value
+        assertEquals(TimerMode.ShortBreak, state.mode)
+        assertEquals(TimerStatus.Idle, state.status)
+        assertEquals(PomodoroConfig.SHORT_BREAK_DURATION, state.remainingTime)
+        assertEquals(0, sessionStore.sessions().first().size)
+    }
+
+    @Test
+    fun `skipping a focus block does not count toward the cycle of four`() = runTest {
+        val engine = TimerEngine(clock = clock, sessionStore = sessionStore)
+        // Skip 3 focus blocks (they should not count)
+        repeat(3) {
+            engine.start()
+            engine.skip()
+            // skip puts us in short break, skip again to return to focus
+            engine.skip()
+        }
+        // Now complete 3 real focus blocks
+        repeat(3) {
+            engine.start()
+            clock.advance(PomodoroConfig.FOCUS_DURATION)
+            engine.tick()
+            engine.skip() // skip the break
+        }
+        // 4th real focus block — should lead to long break
+        engine.start()
+        clock.advance(PomodoroConfig.FOCUS_DURATION)
+        engine.tick()
+
+        assertEquals(TimerMode.LongBreak, engine.state.value.mode)
+    }
+
+    @Test
+    fun `skipping a short break moves to focus idle without saving and sessionInCycle is preserved`() = runTest {
+        val engine = TimerEngine(clock = clock, sessionStore = sessionStore)
+        // Complete first focus block → short break
+        engine.start()
+        clock.advance(PomodoroConfig.FOCUS_DURATION)
+        engine.tick()
+        val sessionsAfterFocus = sessionStore.sessions().first().size
+
+        engine.skip() // skip break
+
+        val state = engine.state.value
+        assertEquals(TimerMode.Focus, state.mode)
+        assertEquals(TimerStatus.Idle, state.status)
+        assertEquals(sessionsAfterFocus, sessionStore.sessions().first().size)
+        assertEquals(2, state.sessionInCycle) // second focus block
+    }
+
+    @Test
+    fun `skipping a long break resets cycle to zero and returns to focus`() = runTest {
+        val engine = TimerEngine(clock = clock, sessionStore = sessionStore)
+        repeat(3) {
+            engine.start()
+            clock.advance(PomodoroConfig.FOCUS_DURATION)
+            engine.tick()
+            engine.skip()
+        }
+        // 4th focus → long break
+        engine.start()
+        clock.advance(PomodoroConfig.FOCUS_DURATION)
+        engine.tick()
+
+        engine.skip() // skip long break
+
+        val state = engine.state.value
+        assertEquals(TimerMode.Focus, state.mode)
+        assertEquals(TimerStatus.Idle, state.status)
+        assertEquals(1, state.sessionInCycle)
+    }
+
+    @Test
+    fun `reset leaves the cycle count unchanged`() = runTest {
+        val engine = TimerEngine(clock = clock, sessionStore = sessionStore)
+        // Complete 2 focus sessions
+        repeat(2) {
+            engine.start()
+            clock.advance(PomodoroConfig.FOCUS_DURATION)
+            engine.tick()
+            engine.skip()
+        }
+        val cycleBeforeReset = engine.state.value.sessionInCycle
+
+        engine.start()
+        clock.advance(Duration.ofMinutes(10))
+        engine.reset()
+
+        assertEquals(cycleBeforeReset, engine.state.value.sessionInCycle)
+        assertEquals(TimerStatus.Idle, engine.state.value.status)
+    }
+
+    @Test
+    fun `full four-session cycle saves exactly four sessions then opens long break then resets cycle`() = runTest {
+        val store = InMemorySessionStore()
+        val testClock = MutableFakeClock(Instant.parse("2026-01-01T09:00:00Z"))
+        val engine = TimerEngine(clock = testClock, sessionStore = store)
+
+        // Complete 4 focus blocks, skipping each short break
+        repeat(3) {
+            engine.start()
+            testClock.advance(PomodoroConfig.FOCUS_DURATION)
+            engine.tick()
+            assertEquals(TimerMode.ShortBreak, engine.state.value.mode)
+            engine.skip()
+            assertEquals(TimerMode.Focus, engine.state.value.mode)
+        }
+        // 4th focus
+        engine.start()
+        testClock.advance(PomodoroConfig.FOCUS_DURATION)
+        engine.tick()
+
+        assertEquals(TimerMode.LongBreak, engine.state.value.mode)
+        assertEquals(4, store.sessions().first().size)
+
+        // Complete long break
+        engine.start()
+        testClock.advance(PomodoroConfig.LONG_BREAK_DURATION)
+        engine.tick()
+
+        val state = engine.state.value
+        assertEquals(TimerMode.Focus, state.mode)
+        assertEquals(1, state.sessionInCycle)
+        assertEquals(4, store.sessions().first().size) // no extra saves
     }
 }

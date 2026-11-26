@@ -28,6 +28,22 @@ class TimerViewModel(
         timerEngine.start()
     }
 
+    fun onPause() {
+        timerEngine.pause()
+    }
+
+    fun onResume() {
+        timerEngine.resume()
+    }
+
+    fun onReset() {
+        timerEngine.reset()
+    }
+
+    fun onSkip() {
+        timerEngine.skip()
+    }
+
     companion object {
         fun provideFactory(timerEngine: TimerEngine): ViewModelProvider.Factory =
             object : ViewModelProvider.Factory {

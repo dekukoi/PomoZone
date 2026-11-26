@@ -7,6 +7,7 @@ object PomodoroConfig {
     val SHORT_BREAK_DURATION: Duration = Duration.ofMinutes(5)
     val LONG_BREAK_DURATION: Duration = Duration.ofMinutes(15)
     const val DAILY_GOAL: Int = 4
+    const val CYCLE_LENGTH: Int = 4
 
     const val HEATMAP_LEVEL_0_MAX: Long = 0L
     const val HEATMAP_LEVEL_1_MAX: Long = 25L

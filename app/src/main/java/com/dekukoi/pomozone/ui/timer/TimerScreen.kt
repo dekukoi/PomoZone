@@ -54,9 +54,16 @@ fun TimerScreen(
     modifier: Modifier = Modifier,
 ) {
     val state by viewModel.state.collectAsState()
+    val onMainButtonClick: () -> Unit = when (state.status) {
+        TimerStatus.Running -> viewModel::onPause
+        TimerStatus.Paused -> viewModel::onResume
+        TimerStatus.Idle -> viewModel::onStart
+    }
     TimerScreen(
         state = state,
-        onStartClick = viewModel::onStart,
+        onStartClick = onMainButtonClick,
+        onResetClick = viewModel::onReset,
+        onSkipClick = viewModel::onSkip,
         modifier = modifier,
     )
 }
@@ -97,6 +104,7 @@ fun TimerScreen(
 
         SessionDotsRow(
             currentSession = state.sessionInCycle,
+            isFocusMode = state.mode == TimerMode.Focus,
             focusColor = MaterialTheme.colorScheme.primary,
             modifier = Modifier.padding(top = 6.dp, bottom = 14.dp),
         )
@@ -248,7 +256,7 @@ private fun ProgressRing(
             val sessionLabel = if (state.mode == TimerMode.Focus) {
                 "Session ${state.sessionInCycle} of 4"
             } else {
-                "${state.sessionInCycle - 1} of 4 done"
+                "${state.sessionInCycle} of 4 done"
             }
             Text(
                 text = sessionLabel,
@@ -262,6 +270,7 @@ private fun ProgressRing(
 @Composable
 private fun SessionDotsRow(
     currentSession: Int,
+    isFocusMode: Boolean,
     focusColor: Color,
     modifier: Modifier = Modifier,
 ) {
@@ -274,19 +283,27 @@ private fun SessionDotsRow(
         for (i in 1..4) {
             when {
                 i < currentSession -> {
-                    // Completed: filled in focus color
+                    // Completed session: filled in focus color
                     Box(
                         modifier = Modifier
                             .size(10.dp)
                             .background(focusColor, CircleShape),
                     )
                 }
-                i == currentSession -> {
-                    // Current block: outline of 2 in focus color
+                i == currentSession && isFocusMode -> {
+                    // Current focus block: outline of 2 in focus color
                     Box(
                         modifier = Modifier
                             .size(10.dp)
                             .border(BorderStroke(2.dp, focusColor), CircleShape),
+                    )
+                }
+                i == currentSession && !isFocusMode -> {
+                    // Most recently completed session shown as filled during a break
+                    Box(
+                        modifier = Modifier
+                            .size(10.dp)
+                            .background(focusColor, CircleShape),
                     )
                 }
                 else -> {
