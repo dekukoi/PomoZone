@@ -18,6 +18,8 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.dekukoi.pomozone.ui.shell.AppTab
 import com.dekukoi.pomozone.ui.shell.PomoZoneShell
 import com.dekukoi.pomozone.ui.shell.ShellState
+import com.dekukoi.pomozone.ui.stats.StatsScreen
+import com.dekukoi.pomozone.ui.stats.StatsViewModel
 import com.dekukoi.pomozone.ui.theme.PomoZoneTheme
 import com.dekukoi.pomozone.ui.timer.TimerScreen
 import com.dekukoi.pomozone.ui.timer.TimerViewModel
@@ -43,6 +45,12 @@ class MainActivity : ComponentActivity() {
                     completionNotifier = container.completionNotifier,
                 ),
             )
+            val statsViewModel: StatsViewModel = viewModel(
+                factory = StatsViewModel.provideFactory(
+                    sessionStore = container.sessionStore,
+                    clock = container.clock,
+                ),
+            )
 
             // Wire permission request: called at most once, on first Start press.
             timerViewModel.onRequestNotificationPermission = {
@@ -66,6 +74,9 @@ class MainActivity : ComponentActivity() {
                     },
                     timerContent = {
                         TimerScreen(viewModel = timerViewModel)
+                    },
+                    statsContent = {
+                        StatsScreen(viewModel = statsViewModel)
                     },
                 )
             }
