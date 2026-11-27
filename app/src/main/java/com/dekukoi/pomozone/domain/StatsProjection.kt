@@ -36,6 +36,7 @@ object StatsProjection {
             val sessionDay: LocalDate = startInstant.atZone(zoneId).toLocalDate()
 
             allTimeMinutes += duration
+            dayMinutesMap[sessionDay] = (dayMinutesMap[sessionDay] ?: 0L) + duration
 
             if (sessionDay == today) {
                 todayMinutes += duration
@@ -44,7 +45,6 @@ object StatsProjection {
 
             if (!sessionDay.isBefore(weekStart) && !sessionDay.isAfter(today)) {
                 thisWeekMinutes += duration
-                dayMinutesMap[sessionDay] = (dayMinutesMap[sessionDay] ?: 0L) + duration
             }
 
             if (duration > 0L) {
@@ -65,6 +65,27 @@ object StatsProjection {
             )
         }
 
+        val currentMonday = today.minusDays((today.dayOfWeek.value - 1).toLong())
+        val heatmapStartMonday = currentMonday.minusWeeks(11)
+
+        val heatmapWeeks = (0..11).map { weekOffset ->
+            val weekMonday = heatmapStartMonday.plusWeeks(weekOffset.toLong())
+            val days = (0..6).map { dayOffset ->
+                val date = weekMonday.plusDays(dayOffset.toLong())
+                val isFuture = date.isAfter(today)
+                val minutes = if (isFuture) 0L else (dayMinutesMap[date] ?: 0L)
+                val level = if (isFuture) 0 else heatmapLevelFor(minutes)
+                HeatmapCell(
+                    date = date,
+                    dayOfWeek = date.dayOfWeek,
+                    minutes = minutes,
+                    level = level,
+                    isFuture = isFuture,
+                )
+            }
+            HeatmapWeek(days = days)
+        }
+
         return StatsModel(
             todayMinutes = todayMinutes,
             thisWeekMinutes = thisWeekMinutes,
@@ -74,6 +95,7 @@ object StatsProjection {
             todaySessions = todaySessions,
             dailyGoal = PomodoroConfig.DAILY_GOAL,
             weeklyBars = weeklyBars,
+            heatmapWeeks = heatmapWeeks,
         )
     }
 

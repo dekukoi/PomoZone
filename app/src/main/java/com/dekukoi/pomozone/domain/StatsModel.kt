@@ -11,6 +11,18 @@ data class DayBarEntry(
     val isToday: Boolean,
 )
 
+data class HeatmapCell(
+    val date: LocalDate,
+    val dayOfWeek: DayOfWeek,
+    val minutes: Long,
+    val level: Int,
+    val isFuture: Boolean,
+)
+
+data class HeatmapWeek(
+    val days: List<HeatmapCell>,
+)
+
 data class StatsModel(
     val todayMinutes: Long = 0L,
     val thisWeekMinutes: Long = 0L,
@@ -20,6 +32,7 @@ data class StatsModel(
     val todaySessions: Int = 0,
     val dailyGoal: Int = PomodoroConfig.DAILY_GOAL,
     val weeklyBars: List<DayBarEntry> = emptyList(),
+    val heatmapWeeks: List<HeatmapWeek> = emptyList(),
 ) {
     val todayFormatted: String get() = formatDuration(todayMinutes)
     val thisWeekFormatted: String get() = formatDuration(thisWeekMinutes)
@@ -46,4 +59,12 @@ fun formatDuration(minutes: Long): String {
 
 fun formatStreak(days: Int): String {
     return if (days == 1) "1 day" else "$days days"
+}
+
+fun heatmapLevelFor(minutes: Long): Int = when {
+    minutes <= PomodoroConfig.HEATMAP_LEVEL_0_MAX -> 0
+    minutes <= PomodoroConfig.HEATMAP_LEVEL_1_MAX -> 1
+    minutes <= PomodoroConfig.HEATMAP_LEVEL_2_MAX -> 2
+    minutes <= PomodoroConfig.HEATMAP_LEVEL_3_MAX -> 3
+    else -> 4
 }

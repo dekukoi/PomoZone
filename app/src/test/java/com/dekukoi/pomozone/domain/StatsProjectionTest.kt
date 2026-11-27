@@ -344,4 +344,116 @@ class StatsProjectionTest {
         assertEquals(50L, bars[6].minutes)
         org.junit.Assert.assertTrue(bars[6].isToday)
     }
+
+    @Test
+    fun `heatmap level thresholds cover all boundary values`() {
+        assertEquals(0, heatmapLevelFor(0L))
+        assertEquals(1, heatmapLevelFor(1L))
+        assertEquals(1, heatmapLevelFor(25L))
+        assertEquals(2, heatmapLevelFor(26L))
+        assertEquals(2, heatmapLevelFor(50L))
+        assertEquals(3, heatmapLevelFor(51L))
+        assertEquals(3, heatmapLevelFor(100L))
+        assertEquals(4, heatmapLevelFor(101L))
+    }
+
+    @Test
+    fun `with no sessions heatmap has 12 weeks with zero-filled days and blank future days`() {
+        // Today is Thursday June 18, 2026
+        val now = Instant.parse("2026-06-18T12:00:00Z")
+        val today = java.time.LocalDate.parse("2026-06-18")
+        val model = StatsProjection.project(emptyList(), now, utcZone)
+
+        val weeks = model.heatmapWeeks
+        assertEquals(12, weeks.size)
+
+        for (week in weeks) {
+            assertEquals(7, week.days.size)
+            assertEquals(java.time.DayOfWeek.MONDAY, week.days.first().dayOfWeek)
+            assertEquals(java.time.DayOfWeek.SUNDAY, week.days.last().dayOfWeek)
+            for (day in week.days) {
+                if (day.date.isAfter(today)) {
+                    org.junit.Assert.assertTrue("Day after today should be marked as future", day.isFuture)
+                } else {
+                    org.junit.Assert.assertFalse("Day on or before today should not be marked as future", day.isFuture)
+                    assertEquals(0L, day.minutes)
+                    assertEquals(0, day.level)
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `heatmap week alignment starts on Monday and ends on current week`() {
+        // Today is Wednesday Nov 25, 2026
+        val now = Instant.parse("2026-11-25T14:00:00Z")
+        val model = StatsProjection.project(emptyList(), now, utcZone)
+
+        val weeks = model.heatmapWeeks
+        assertEquals(12, weeks.size)
+
+        // Current week's Monday is Nov 23, 2026
+        val currentMonday = java.time.LocalDate.parse("2026-11-23")
+        assertEquals(currentMonday, weeks.last().days.first().date)
+        assertEquals(java.time.DayOfWeek.MONDAY, weeks.last().days.first().dayOfWeek)
+
+        // Oldest week's Monday is 11 weeks before current Monday (Sept 7, 2026)
+        val startMonday = currentMonday.minusWeeks(11)
+        assertEquals(startMonday, weeks.first().days.first().date)
+        assertEquals(java.time.DayOfWeek.MONDAY, weeks.first().days.first().dayOfWeek)
+
+        // In the current week, Thursday, Friday, Saturday, Sunday are after Wednesday (Nov 25)
+        val currentWeek = weeks.last()
+        org.junit.Assert.assertFalse(currentWeek.days[0].isFuture) // Mon Nov 23
+        org.junit.Assert.assertFalse(currentWeek.days[1].isFuture) // Tue Nov 24
+        org.junit.Assert.assertFalse(currentWeek.days[2].isFuture) // Wed Nov 25 (today)
+        org.junit.Assert.assertTrue(currentWeek.days[3].isFuture)  // Thu Nov 26
+        org.junit.Assert.assertTrue(currentWeek.days[4].isFuture)  // Fri Nov 27
+        org.junit.Assert.assertTrue(currentWeek.days[5].isFuture)  // Sat Nov 28
+        org.junit.Assert.assertTrue(currentWeek.days[6].isFuture)  // Sun Nov 29
+    }
+
+    @Test
+    fun `heatmap groups sessions by date and assigns correct levels to each day`() {
+        // Today is Wednesday Nov 25, 2026
+        val now = Instant.parse("2026-11-25T14:00:00Z")
+        val sessions = listOf(
+            // Monday Nov 23: 25 min -> level 1
+            SessionRecord(Instant.parse("2026-11-23T10:00:00Z"), 25L),
+            // Tuesday Nov 24: 50 min (two 25m sessions) -> level 2
+            SessionRecord(Instant.parse("2026-11-24T09:00:00Z"), 25L),
+            SessionRecord(Instant.parse("2026-11-24T14:00:00Z"), 25L),
+            // Wednesday Nov 25 (today): 100 min (four sessions) -> level 3
+            SessionRecord(Instant.parse("2026-11-25T08:00:00Z"), 25L),
+            SessionRecord(Instant.parse("2026-11-25T10:00:00Z"), 25L),
+            SessionRecord(Instant.parse("2026-11-25T12:00:00Z"), 25L),
+            SessionRecord(Instant.parse("2026-11-25T14:00:00Z"), 25L),
+            // Last week Friday (Nov 20): 125 min (five sessions) -> level 4
+            SessionRecord(Instant.parse("2026-11-20T08:00:00Z"), 25L),
+            SessionRecord(Instant.parse("2026-11-20T10:00:00Z"), 25L),
+            SessionRecord(Instant.parse("2026-11-20T12:00:00Z"), 25L),
+            SessionRecord(Instant.parse("2026-11-20T14:00:00Z"), 25L),
+            SessionRecord(Instant.parse("2026-11-20T16:00:00Z"), 25L),
+        )
+
+        val model = StatsProjection.project(sessions, now, utcZone)
+
+        val currentWeek = model.heatmapWeeks[11]
+        val monday = currentWeek.days[0]
+        assertEquals(25L, monday.minutes)
+        assertEquals(1, monday.level)
+
+        val tuesday = currentWeek.days[1]
+        assertEquals(50L, tuesday.minutes)
+        assertEquals(2, tuesday.level)
+
+        val wednesday = currentWeek.days[2]
+        assertEquals(100L, wednesday.minutes)
+        assertEquals(3, wednesday.level)
+
+        val previousWeek = model.heatmapWeeks[10]
+        val friday = previousWeek.days[4] // Friday Nov 20
+        assertEquals(125L, friday.minutes)
+        assertEquals(4, friday.level)
+    }
 }

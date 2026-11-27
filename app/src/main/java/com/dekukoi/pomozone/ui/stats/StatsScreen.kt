@@ -40,6 +40,8 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.dekukoi.pomozone.domain.DayBarEntry
+import com.dekukoi.pomozone.domain.HeatmapCell
+import com.dekukoi.pomozone.domain.HeatmapWeek
 import com.dekukoi.pomozone.domain.StatsModel
 import com.dekukoi.pomozone.ui.theme.PomoTheme
 import com.dekukoi.pomozone.ui.theme.PomoZoneTheme
@@ -73,6 +75,7 @@ fun StatsScreen(
         SummaryCards(state = state)
         GoalPanel(state = state)
         WeeklyBarsPanel(bars = state.weeklyBars)
+        HeatmapPanel(weeks = state.heatmapWeeks)
     }
 }
 
@@ -308,6 +311,81 @@ private fun WeeklyBarsPanel(
     }
 }
 
+@Composable
+private fun HeatmapPanel(
+    weeks: List<HeatmapWeek>,
+    modifier: Modifier = Modifier,
+) {
+    val muteColor = MaterialTheme.colorScheme.onSurfaceVariant
+
+    Surface(
+        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(14.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant,
+    ) {
+        Column(
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+        ) {
+            Text(
+                text = "LAST 12 WEEKS",
+                style = MaterialTheme.typography.labelMedium,
+                color = muteColor,
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(3.dp),
+            ) {
+                weeks.forEach { (days) ->
+                    Column(
+                        modifier = Modifier.weight(1f),
+                        verticalArrangement = Arrangement.spacedBy(3.dp),
+                    ) {
+                        days.forEach { (_, _, _, level, isFuture) ->
+                            val cellModifier = Modifier
+                                .fillMaxWidth()
+                                .height(11.dp)
+                                .clip(RoundedCornerShape(3.dp))
+                            if (isFuture) {
+                                Box(modifier = cellModifier)
+                            } else {
+                                Box(
+                                    modifier = cellModifier.background(PomoTheme.colors.heat[level]),
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+            Spacer(modifier = Modifier.height(6.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(3.dp, Alignment.End),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = "Less",
+                    style = TextStyle(fontSize = 9.sp, fontWeight = FontWeight.Normal),
+                    color = muteColor,
+                )
+                for (level in 0..4) {
+                    Box(
+                        modifier = Modifier
+                            .size(9.dp)
+                            .clip(RoundedCornerShape(2.dp))
+                            .background(PomoTheme.colors.heat[level]),
+                    )
+                }
+                Text(
+                    text = "More",
+                    style = TextStyle(fontSize = 9.sp, fontWeight = FontWeight.Normal),
+                    color = muteColor,
+                )
+            }
+        }
+    }
+}
+
 @Preview(showBackground = true)
 @Composable
 private fun StatsScreenLightPreview() {
@@ -321,6 +399,22 @@ private fun StatsScreenLightPreview() {
         DayBarEntry(baseDate.minusDays(1), DayOfWeek.SUNDAY, "S", 50L, isToday = false),
         DayBarEntry(baseDate, DayOfWeek.MONDAY, "M", 75L, isToday = true),
     )
+    val sampleWeeks = (0..11).map { weekIndex ->
+        val weekDate = baseDate.minusWeeks((11 - weekIndex).toLong())
+        HeatmapWeek(
+            days = (0..6).map { dayIndex ->
+                val date = weekDate.plusDays(dayIndex.toLong())
+                val isFuture = (weekIndex == 11) && (dayIndex > 0)
+                HeatmapCell(
+                    date = date,
+                    dayOfWeek = date.dayOfWeek,
+                    minutes = if (isFuture) 0L else ((((weekIndex * 7) + dayIndex) * 15L) % 125L),
+                    level = if (isFuture) 0 else ((weekIndex + dayIndex) % 5),
+                    isFuture = isFuture,
+                )
+            },
+        )
+    }
     PomoZoneTheme(darkTheme = false) {
         StatsScreen(
             state = StatsModel(
@@ -331,6 +425,7 @@ private fun StatsScreenLightPreview() {
                 totalSessions = 101,
                 todaySessions = 3,
                 weeklyBars = sampleBars,
+                heatmapWeeks = sampleWeeks,
             ),
         )
     }

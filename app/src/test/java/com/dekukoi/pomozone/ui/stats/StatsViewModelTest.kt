@@ -53,6 +53,7 @@ class StatsViewModelTest {
         assertEquals("0 of 4", state.goalLabel)
         assertEquals(0.0f, state.goalFraction, 0.001f)
         assertEquals(7, state.weeklyBars.size)
+        assertEquals(12, state.heatmapWeeks.size)
 
         job.cancel()
     }
