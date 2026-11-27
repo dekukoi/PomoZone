@@ -49,6 +49,10 @@ class StatsViewModelTest {
         assertEquals(0, state.totalSessions)
         assertEquals("0", state.todayFormatted)
         assertEquals("0 days", state.streakFormatted)
+        assertEquals(0, state.todaySessions)
+        assertEquals("0 of 4", state.goalLabel)
+        assertEquals(0.0f, state.goalFraction, 0.001f)
+        assertEquals(7, state.weeklyBars.size)
 
         job.cancel()
     }

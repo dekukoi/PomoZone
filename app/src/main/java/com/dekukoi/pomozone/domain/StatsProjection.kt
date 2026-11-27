@@ -22,17 +22,15 @@ object StatsProjection {
         currentInstant: Instant,
         zoneId: ZoneId,
     ): StatsModel {
-        if (sessions.isEmpty()) {
-            return StatsModel()
-        }
-
         val today: LocalDate = currentInstant.atZone(zoneId).toLocalDate()
         val weekStart: LocalDate = today.minusDays(6)
 
         var todayMinutes = 0L
+        var todaySessions = 0
         var thisWeekMinutes = 0L
         var allTimeMinutes = 0L
         val activeDays = mutableSetOf<LocalDate>()
+        val dayMinutesMap = mutableMapOf<LocalDate, Long>()
 
         for ((startInstant, duration) in sessions) {
             val sessionDay: LocalDate = startInstant.atZone(zoneId).toLocalDate()
@@ -41,10 +39,12 @@ object StatsProjection {
 
             if (sessionDay == today) {
                 todayMinutes += duration
+                todaySessions++
             }
 
             if (!sessionDay.isBefore(weekStart) && !sessionDay.isAfter(today)) {
                 thisWeekMinutes += duration
+                dayMinutesMap[sessionDay] = (dayMinutesMap[sessionDay] ?: 0L) + duration
             }
 
             if (duration > 0L) {
@@ -54,12 +54,26 @@ object StatsProjection {
 
         val streakDays = computeStreak(activeDays, today)
 
+        val weeklyBars = (6 downTo 0).map { offset ->
+            val day = today.minusDays(offset.toLong())
+            DayBarEntry(
+                date = day,
+                dayOfWeek = day.dayOfWeek,
+                label = day.dayOfWeek.name.first().toString(),
+                minutes = dayMinutesMap[day] ?: 0L,
+                isToday = (day == today),
+            )
+        }
+
         return StatsModel(
             todayMinutes = todayMinutes,
             thisWeekMinutes = thisWeekMinutes,
             allTimeMinutes = allTimeMinutes,
             streakDays = streakDays,
             totalSessions = sessions.size,
+            todaySessions = todaySessions,
+            dailyGoal = PomodoroConfig.DAILY_GOAL,
+            weeklyBars = weeklyBars,
         )
     }
 

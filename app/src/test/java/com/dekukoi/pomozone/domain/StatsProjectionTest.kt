@@ -226,4 +226,122 @@ class StatsProjectionTest {
         assertEquals("1 day", formatStreak(1))
         assertEquals("5 days", formatStreak(5))
     }
+
+    @Test
+    fun `goal progress below the goal shows label and matching fraction`() {
+        val now = Instant.parse("2026-06-15T18:00:00Z")
+        val sessions = listOf(
+            SessionRecord(Instant.parse("2026-06-15T09:00:00Z"), 25L),
+            SessionRecord(Instant.parse("2026-06-15T11:00:00Z"), 25L),
+            SessionRecord(Instant.parse("2026-06-15T14:00:00Z"), 25L),
+            SessionRecord(Instant.parse("2026-06-14T10:00:00Z"), 25L), // yesterday
+        )
+
+        val model = StatsProjection.project(sessions, now, utcZone)
+
+        assertEquals(3, model.todaySessions)
+        assertEquals(4, model.dailyGoal)
+        assertEquals("3 of 4", model.goalLabel)
+        assertEquals(0.75f, model.goalFraction, 0.001f)
+    }
+
+    @Test
+    fun `goal progress at the goal shows full ring and matching label`() {
+        val now = Instant.parse("2026-06-15T18:00:00Z")
+        val sessions = listOf(
+            SessionRecord(Instant.parse("2026-06-15T09:00:00Z"), 25L),
+            SessionRecord(Instant.parse("2026-06-15T11:00:00Z"), 25L),
+            SessionRecord(Instant.parse("2026-06-15T14:00:00Z"), 25L),
+            SessionRecord(Instant.parse("2026-06-15T16:00:00Z"), 25L),
+        )
+
+        val model = StatsProjection.project(sessions, now, utcZone)
+
+        assertEquals(4, model.todaySessions)
+        assertEquals("4 of 4", model.goalLabel)
+        assertEquals(1.0f, model.goalFraction, 0.001f)
+    }
+
+    @Test
+    fun `goal progress above the goal caps ring fraction at full and shows real count in label`() {
+        val now = Instant.parse("2026-06-15T20:00:00Z")
+        val sessions = listOf(
+            SessionRecord(Instant.parse("2026-06-15T09:00:00Z"), 25L),
+            SessionRecord(Instant.parse("2026-06-15T11:00:00Z"), 25L),
+            SessionRecord(Instant.parse("2026-06-15T13:00:00Z"), 25L),
+            SessionRecord(Instant.parse("2026-06-15T15:00:00Z"), 25L),
+            SessionRecord(Instant.parse("2026-06-15T17:00:00Z"), 25L),
+        )
+
+        val model = StatsProjection.project(sessions, now, utcZone)
+
+        assertEquals(5, model.todaySessions)
+        assertEquals("5 of 4", model.goalLabel)
+        assertEquals(1.0f, model.goalFraction, 0.001f)
+    }
+
+    @Test
+    fun `with no sessions weekly bars has seven zero-filled entries oldest first and today last`() {
+        // Today is Monday June 15, 2026
+        val now = Instant.parse("2026-06-15T12:00:00Z")
+        val model = StatsProjection.project(emptyList(), now, utcZone)
+
+        val bars = model.weeklyBars
+        assertEquals(7, bars.size)
+
+        // 7 days: June 9 (Tuesday) to June 15 (Monday)
+        val expectedDates = (6 downTo 0).map { offset ->
+            java.time.LocalDate.parse("2026-06-15").minusDays(offset.toLong())
+        }
+        for (i in 0 until 7) {
+            val bar = bars[i]
+            assertEquals(expectedDates[i], bar.date)
+            assertEquals(0L, bar.minutes)
+            assertEquals(expectedDates[i].dayOfWeek.name.first().toString(), bar.label)
+            if (i == 6) {
+                org.junit.Assert.assertTrue("Today's bar should be flagged as isToday", bar.isToday)
+            } else {
+                org.junit.Assert.assertFalse("Non-today bar should not be isToday", bar.isToday)
+            }
+        }
+    }
+
+    @Test
+    fun `weekly bars has exactly 7 bars with correct minutes and today highlighted`() {
+        // Today is Monday June 15, 2026
+        val now = Instant.parse("2026-06-15T12:00:00Z")
+        val sessions = listOf(
+            SessionRecord(Instant.parse("2026-06-15T09:00:00Z"), 50L), // today (June 15): 50m
+            SessionRecord(Instant.parse("2026-06-13T10:00:00Z"), 25L), // Saturday June 13: 25m
+            SessionRecord(Instant.parse("2026-06-09T08:00:00Z"), 100L), // Tuesday June 9: 100m
+            SessionRecord(Instant.parse("2026-06-08T18:00:00Z"), 50L), // June 8: 8 days ago (outside 7-day range)
+        )
+
+        val model = StatsProjection.project(sessions, now, utcZone)
+
+        val bars = model.weeklyBars
+        assertEquals(7, bars.size)
+
+        // Oldest first: June 9
+        assertEquals(java.time.LocalDate.parse("2026-06-09"), bars[0].date)
+        assertEquals(100L, bars[0].minutes)
+        org.junit.Assert.assertFalse(bars[0].isToday)
+
+        // June 10, 11, 12 should be empty (0m)
+        assertEquals(0L, bars[1].minutes)
+        assertEquals(0L, bars[2].minutes)
+        assertEquals(0L, bars[3].minutes)
+
+        // June 13
+        assertEquals(java.time.LocalDate.parse("2026-06-13"), bars[4].date)
+        assertEquals(25L, bars[4].minutes)
+
+        // June 14
+        assertEquals(0L, bars[5].minutes)
+
+        // Today (June 15): last entry
+        assertEquals(java.time.LocalDate.parse("2026-06-15"), bars[6].date)
+        assertEquals(50L, bars[6].minutes)
+        org.junit.Assert.assertTrue(bars[6].isToday)
+    }
 }
